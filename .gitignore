@@ -1,0 +1,28 @@
+# Packer
+*.box
+packer_cache/
+output-*/
+manifest.json
+
+# Azure
+*.pfx
+*.pem
+azure-creds.json
+
+# Local env
+.env
+*.local.pkrvars.hcl
+
+# Editor
+.vscode/
+*.swp
+*~
+
+# Logs
+*.log
+crash.log
+
+# OS
+Thumbs.db
+.DS_Store
+packer/variables.pkrvars.hcl

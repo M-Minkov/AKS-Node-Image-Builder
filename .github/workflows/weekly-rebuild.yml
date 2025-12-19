@@ -1,0 +1,47 @@
+name: Weekly Security Rebuild
+
+on:
+  schedule:
+    # Sundays at 2am UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+
+jobs:
+  rebuild-images:
+    strategy:
+      matrix:
+        k8s_version: ['1.28', '1.29', '1.30']
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+        with:
+          version: '1.10.0'
+      
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Init Packer
+        run: packer init ./packer
+      
+      - name: Build Ubuntu image (k8s ${{ matrix.k8s_version }})
+        run: |
+          packer build \
+            -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+            -var="client_id=${{ secrets.AZURE_CLIENT_ID }}" \
+            -var="client_secret=${{ secrets.AZURE_CLIENT_SECRET }}" \
+            -var="tenant_id=${{ secrets.AZURE_TENANT_ID }}" \
+            -var="resource_group=${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            -var="k8s_version=${{ matrix.k8s_version }}" \
+            -only=azure-arm.ubuntu \
+            ./packer
+      
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "Build failed for k8s ${{ matrix.k8s_version }}"
+          # Add Slack/Teams notification here if needed

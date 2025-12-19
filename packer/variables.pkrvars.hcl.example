@@ -1,0 +1,21 @@
+# Copy this to variables.pkrvars.hcl and fill in your values
+
+subscription_id = ""
+resource_group  = "rg-aks-images"
+location        = "eastus"
+
+# Service Principal auth
+client_id     = ""
+client_secret = ""
+tenant_id     = ""
+
+# Or use CLI auth instead (comment out the SP values above)
+# use_azure_cli_auth = true
+
+# Kubernetes
+k8s_version        = "1.29"
+containerd_version = "1.7.11"
+
+# GPU (only needed for GPU builds)
+enable_gpu            = false
+nvidia_driver_version = "535"

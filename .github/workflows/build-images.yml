@@ -1,0 +1,151 @@
+name: Build AKS Node Images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packer/**'
+      - 'scripts/**'
+      - '.github/workflows/build-images.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      build_target:
+        description: 'What to build'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - ubuntu
+          - ubuntu-gpu
+          - windows
+          - all
+      k8s_version:
+        description: 'Kubernetes version'
+        required: false
+        default: '1.29'
+
+env:
+  PACKER_VERSION: '1.10.0'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+        with:
+          version: ${{ env.PACKER_VERSION }}
+      
+      - name: Init Packer
+        run: packer init ./packer
+      
+      - name: Validate templates
+        run: |
+          packer validate \
+            -var="subscription_id=dummy" \
+            -var="resource_group=dummy" \
+            -var="client_id=dummy" \
+            -var="client_secret=dummy" \
+            -var="tenant_id=dummy" \
+            ./packer
+
+  build-ubuntu:
+    needs: validate
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.build_target == 'ubuntu' || github.event.inputs.build_target == 'all'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+        with:
+          version: ${{ env.PACKER_VERSION }}
+      
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Init Packer
+        run: packer init ./packer
+      
+      - name: Build Ubuntu image
+        run: |
+          packer build \
+            -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+            -var="client_id=${{ secrets.AZURE_CLIENT_ID }}" \
+            -var="client_secret=${{ secrets.AZURE_CLIENT_SECRET }}" \
+            -var="tenant_id=${{ secrets.AZURE_TENANT_ID }}" \
+            -var="resource_group=${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            -var="k8s_version=${{ github.event.inputs.k8s_version || '1.29' }}" \
+            -only=azure-arm.ubuntu \
+            ./packer
+
+  build-ubuntu-gpu:
+    needs: validate
+    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.build_target == 'ubuntu-gpu' || github.event.inputs.build_target == 'all')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+        with:
+          version: ${{ env.PACKER_VERSION }}
+      
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Init Packer
+        run: packer init ./packer
+      
+      - name: Build Ubuntu GPU image
+        run: |
+          packer build \
+            -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+            -var="client_id=${{ secrets.AZURE_CLIENT_ID }}" \
+            -var="client_secret=${{ secrets.AZURE_CLIENT_SECRET }}" \
+            -var="tenant_id=${{ secrets.AZURE_TENANT_ID }}" \
+            -var="resource_group=${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            -var="k8s_version=${{ github.event.inputs.k8s_version || '1.29' }}" \
+            -var="enable_gpu=true" \
+            -only=azure-arm.ubuntu \
+            ./packer
+
+  build-windows:
+    needs: validate
+    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.build_target == 'windows' || github.event.inputs.build_target == 'all')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+        with:
+          version: ${{ env.PACKER_VERSION }}
+      
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Init Packer
+        run: packer init ./packer
+      
+      - name: Build Windows image
+        run: |
+          packer build \
+            -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+            -var="client_id=${{ secrets.AZURE_CLIENT_ID }}" \
+            -var="client_secret=${{ secrets.AZURE_CLIENT_SECRET }}" \
+            -var="tenant_id=${{ secrets.AZURE_TENANT_ID }}" \
+            -var="resource_group=${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            -var="k8s_version=${{ github.event.inputs.k8s_version || '1.29' }}" \
+            -only=azure-arm.windows \
+            ./packer
